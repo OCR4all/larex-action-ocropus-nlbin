@@ -1,0 +1,11 @@
+services:
+  action:
+    container_name: larex-action-${NAME:?No name defined}
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${PORT:?No port defined}:9000"
+    restart: unless-stopped

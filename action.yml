@@ -1,0 +1,16 @@
+version: 1
+id: ...
+name: ...
+
+endpoint:
+  url: http://larex.example.com/action/dispatch
+  healthUrl: http://larex.example.com/action/health
+  parameterValuesUrl: http://larex.example.com/action/parameter-values  # optional
+  timeoutSeconds: 30
+  auth:
+    type: hmac
+    secretRef: ...
+
+# See https://docs.larex.kallimachos.de/actions/yaml-reference for further configuration
+inputs:
+  ...
