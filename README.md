@@ -1,4 +1,4 @@
-# LAREX Action: SBB Binarization
+# LAREX Action: Ocropus NLBIN
 
 [LAREX](https://github.com/OCR4all/LAREX/) action for image binarization and normalization using [nlbin](https://github.com/jahtz/nlbin).
 
