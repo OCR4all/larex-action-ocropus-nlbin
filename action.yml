@@ -1,16 +1,101 @@
 version: 1
-id: ...
-name: ...
+id: <processor-id>
+name: Ocropus NLBIN
+description: Ocropus image normalization and binarization.
+kind: PROCESSING
+tags:
+  - preprocessing
+targets:
+  - PAGE
 
 endpoint:
-  url: http://larex.example.com/action/dispatch
-  healthUrl: http://larex.example.com/action/health
-  parameterValuesUrl: http://larex.example.com/action/parameter-values  # optional
+  url: http://<action-url>/dispatch
+  healthUrl: http://<action-url>/health
   timeoutSeconds: 30
   auth:
     type: hmac
-    secretRef: ...
+    secretRef: <action-secret>
 
-# See https://docs.larex.kallimachos.de/actions/yaml-reference for further configuration
+# See https://docs.larex.kallimachos.de/actions/yaml-reference for further help
+access:
+  execute: CURATOR
+
+locking:
+  mode: PAGES
+
 inputs:
-  ...
+  images:
+    level: required
+
+outputs:
+  images:
+    enabled: true
+    variants:
+      - ocropus.bin.png
+      - ocropus.nrm.png
+
+concurrency:
+  maxActiveRuns: 1
+  scope: PROJECT
+
+parameters:
+  Binarize:
+    type: boolean
+    default: true
+    description: Save the binary (black and white) version of the image.
+  Normalize:
+    type: boolean
+    default: true
+    description: Save the normalized (grayscale) version of the image.
+  Threshold:
+    type: number
+    default: 0.5
+    min: 0
+    max: 1
+    description: Binarization threshold. Higher values produce darker images.
+    required: true
+  Zoom:
+    type: number
+    default: 0.5
+    description: Zoom factor for background estimation. Smaller values focus on finer details.
+    required: true
+  Scale:
+    type: number
+    default: 1.0
+    description: Scale for text region mask estimation. Affects sensitivity to text features.
+    required: true
+  Border:
+    type: number
+    default: 0.1
+    min: 0
+    max: 1
+    description: Fraction of image border to ignore to avoid edge artifacts.
+    required: true
+  Percentile:
+    type: integer
+    default: 80
+    min: 0
+    max: 100
+    description: Central percentile for background estimation.
+    required: true
+  Range:
+    type: integer
+    default: 20
+    min: 0
+    max: 100
+    description: Range around percentile for filtering.
+    required: true
+  Low:
+    type: integer
+    default: 5
+    min: 0
+    max: 100
+    description: Lower percentile for black pixel estimation.
+    required: true
+  High:
+    type: integer
+    default: 90
+    min: 0
+    max: 100
+    description: Upper percentile for black pixel estimation.
+    required: true

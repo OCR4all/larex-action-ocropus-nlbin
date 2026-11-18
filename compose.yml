@@ -9,3 +9,7 @@ services:
     ports:
       - "${PORT:?No port defined}:9000"
     restart: unless-stopped
+    devices:
+      - nvidia.com/gpu=all
+    security_opt:
+      - label=disable

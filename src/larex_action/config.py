@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
-from __future__ import annotations
-
 import asyncio
+from functools import cached_property
+from typing import Literal
 
-from pydantic import PositiveInt, computed_field
+from pydantic import PositiveInt
 from pydantic_settings import BaseSettings
 
 
@@ -16,14 +16,17 @@ class Settings(BaseSettings):
     
     ACTION_DEBUG: bool = False
     ACTION_MAX_CONCURRENT_RUNS: PositiveInt = 1
-    ACTION_PAGE_TIMEOUT: PositiveInt | None = None
+    ACTION_LOADING_TIMEOUT: PositiveInt | None = 30
+    ACTION_PROCESSING_TIMEOUT: PositiveInt | None = 30
+    ACTION_TIMEOUT_MODE: Literal['fail_action', 'fail_page'] = 'fail_page'
     
-    # TEMPLATE: add custom config fields here. Use with env.PROPERTY
-    # ...
-    
-    @computed_field
-    @property
+    @cached_property
     def RUN_SEMAPHORE(self) -> asyncio.Semaphore:
         return asyncio.Semaphore(self.ACTION_MAX_CONCURRENT_RUNS)
+    
+    NLBIN_DEVICE: Literal['cpu', 'gpu', 'auto'] = 'gpu'
+    NLBIN_BIN_SUFFIX: str = '.ocropus.bin.png'
+    NLBIN_NRM_SUFFIX: str = '.ocropus.nrm.png'
+
 
 env = Settings()

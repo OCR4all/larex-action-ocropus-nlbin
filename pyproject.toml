@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "larex-action"
 version = "0.1.0"
-description = "Starter template for LAREX Action processors"
+description = "Calculate binary and normalized versions of a set of input images using OCRopus nlbin algorithm."
 readme = "README.md"
 authors = [
     { name = "OCR4all", email = "ocr4all@uni-wuerzburg.de" }
@@ -13,6 +13,10 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "larex-action-sdk[fastapi]>=0.23.0",
+    "nlbin[cuda12ctk]",
     "pydantic-settings>=2.15.0",
     "uvicorn>=0.54.0",
 ]
+
+[tool.uv.sources]
+nlbin = { git = "https://github.com/jahtz/nlbin.git", branch = "larex-action" }
