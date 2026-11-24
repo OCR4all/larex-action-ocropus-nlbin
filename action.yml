@@ -25,6 +25,8 @@ locking:
 
 inputs:
   images:
+    imageTypes: [COLOR, GRAYSCALE, BINARY]
+    preferredImageType: COLOR
     level: required
 
 outputs:

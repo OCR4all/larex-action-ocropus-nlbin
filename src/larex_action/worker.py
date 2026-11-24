@@ -31,20 +31,20 @@ class WorkerStatus:
     message: str | None = None
 
 
-def worker(
-    connection: Connection, 
-    threshold: float, 
-    zoom: float, 
-    scale: float, 
-    border: float, 
-    percentile: int, 
-    range_: int, 
-    low: int, 
-    high: int
-) -> None:
+def _send(connection: Connection, message: object) -> bool:
+    """ Send a message to the parent. Returns False if the parent is gone. """
+    try:
+        connection.send(message)
+    except OSError:
+        logger.warning(f'Could not send {type(message).__name__} to parent')
+        return False
+    return True
+
+
+def worker(connection: Connection, *args) -> None:
     """
     Process-isolated action worker.
- 
+
     Protocol:
     1. Send exactly one `WorkerStatus` after startup: 'loaded', or 'error' followed by exit if loading failed.
     2. For every request (`request = connection.recv()`), send exactly one `WorkerResponse`
@@ -52,75 +52,58 @@ def worker(
     3. Exit when `None` is received or the parent closes the pipe.
     """
     logger.debug('Initialize worker')
-    
-    try:
-        from nlbin import Nlbin
-        from PIL import Image
-        
-        nlbin = Nlbin(env.NLBIN_DEVICE)
-        
-        connection.send(WorkerStatus('loaded'))
-    except Exception as exc:
-        logger.exception('Failed to load worker')
-        try:
-            connection.send(WorkerStatus('error', f'{type(exc).__name__} {exc}'))
-        except (BrokenPipeError, EOFError, OSError):
-            logger.warning('Could not send load failure to parent')
-        connection.close()
-        return
-    
-    def _fmt(suffix: str) -> str:
-        ext = suffix.split('.')[-1]
-        return {'jpg': 'JPEG', 'jpeg': 'JPEG', 'tif': 'TIFF'}.get(ext, ext.upper())
 
-    def to_bytes(img: Image.Image, suffix: str) -> bytes:
-        fmt = _fmt(suffix)
-        # JPEG can't store mode "1" (or "P"/"RGBA"); convert if needed
-        if fmt == 'JPEG' and img.mode not in ('L', 'RGB'):
-            img = img.convert('L')
-        buf = io.BytesIO()
-        img.save(buf, format=fmt)
-        return buf.getvalue()   # bytes, independent of cursor position
-    
-    while True:
+    with connection:
         try:
-            request = connection.recv()
-        except EOFError:
-            logger.debug('Parent closed pipe; shutting down worker')
-            break
-        if request is None:
-            logger.debug('Parent sent shutdown signal; shutting down worker')
-            break   
-        if not isinstance(request, WorkerRequest):
-            logger.error(f'Received unexpected request: {type(request).__name__}')
-            continue
-
-        try:
-            image = Image.open(io.BytesIO(request.image))
-            binary, normalized = nlbin.process(
-                image, 
-                threshold, 
-                zoom, 
-                scale, 
-                border, 
-                percentile, 
-                range_,
-                low,
-                high
-            )
+            from nlbin import Nlbin
+            from PIL import Image
             
-            connection.send(WorkerResponse(
-                to_bytes(binary, env.NLBIN_BIN_SUFFIX), 
-                to_bytes(normalized, env.NLBIN_NRM_SUFFIX)
-            ))
-
+            nlbin = Nlbin(env.NLBIN_DEVICE)
         except Exception as exc:
-            logger.exception('Failed to process element')
+            logger.exception('Failed to load worker')
+            _send(connection, WorkerStatus('error', f'{type(exc).__name__} {exc}'))
+            return
+
+        if not _send(connection, WorkerStatus('loaded')):
+            return
+        
+        def _fmt(suffix: str) -> str:
+            ext = suffix.split('.')[-1]
+            return {'jpg': 'JPEG', 'jpeg': 'JPEG', 'tif': 'TIFF'}.get(ext, ext.upper())
+
+        def _to_bytes(img: Image.Image, suffix: str) -> bytes:
+            fmt = _fmt(suffix)
+            if fmt == 'JPEG' and img.mode not in ('L', 'RGB'):
+                img = img.convert('L')
+            buf = io.BytesIO()
+            img.save(buf, format=fmt)
+            return buf.getvalue()
+
+        while True:
             try:
-                connection.send(WorkerStatus('error', f'{type(exc).__name__} {exc}'))
-            except (BrokenPipeError, EOFError, OSError):
-                logger.warning('Could not send worker failure to parent')
+                request = connection.recv()
+            except (EOFError, OSError):
+                logger.debug('Parent closed pipe; shutting down worker')
+                break
+            if request is None:
+                logger.debug('Parent sent shutdown signal; shutting down worker')
                 break
 
-    connection.close()
+            try:
+                if not isinstance(request, WorkerRequest):
+                    raise TypeError(f'Unexpected request: {type(request).__name__}')
+
+                image = Image.open(io.BytesIO(request.image))
+                binary, normalized = nlbin.process(image, *args)
+                
+                connection.send(WorkerResponse(
+                    _to_bytes(binary, env.NLBIN_BIN_SUFFIX), 
+                    _to_bytes(normalized, env.NLBIN_NRM_SUFFIX)
+                ))
+
+            except Exception as exc:
+                logger.exception('Failed to process element')
+                if not _send(connection, WorkerStatus('error', f'{type(exc).__name__} {exc}')):
+                    break
+
     logger.info('Worker stopped successfully')
